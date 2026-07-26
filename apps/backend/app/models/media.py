@@ -11,6 +11,7 @@ class Media(Base):
     owner_type = Column(String(20), nullable=False)  # "group" | "dish"
     owner_id = Column(Integer, nullable=False)
     media_type = Column(String(10), nullable=False)  # "image" | "video"
+    category = Column(String(20))  # 圖片用："step"（步驟照片）| "finished"（完成圖），影片不需要
     file_url = Column(String(500), nullable=False)
     caption = Column(String(255))
     sort_order = Column(Integer, default=0)

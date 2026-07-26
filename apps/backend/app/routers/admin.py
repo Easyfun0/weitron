@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models import AdminUser, QuestionGroup, Dish, MaterialItem, KnifeWorkItem
 from app.schemas.admin import LoginRequest, TokenResponse
-from app.schemas.group import GroupIn, GroupDetailOut
+from app.schemas.group import GroupIn, GroupDetailOut, DishIn
 from app.auth.jwt_handler import verify_password, create_access_token, get_current_admin
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -17,6 +17,27 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="帳號或密碼錯誤")
     token = create_access_token(subject=user.username)
     return TokenResponse(access_token=token)
+
+
+def _sync_dishes(group: QuestionGroup, dishes_in: list[DishIn]) -> None:
+    """
+    以 id 為準做 upsert：payload 帶 id 的視為更新既有菜餚（保留 id，
+    這樣已上傳掛在該菜餚下的照片/影片不會失聯）；沒有 id 的視為新菜餚。
+    原本存在、但這次 payload 沒帶到的菜餚會被移除（cascade 清掉，
+    其底下媒體不會自動跟著刪，仍留在資料庫但會變成無主資料，MVP 階段先不處理）。
+    """
+    existing_by_id = {d.id: d for d in group.dishes}
+    new_dishes = []
+    for d in dishes_in:
+        fields = d.model_dump(exclude={"id"})
+        if d.id is not None and d.id in existing_by_id:
+            dish = existing_by_id[d.id]
+            for key, value in fields.items():
+                setattr(dish, key, value)
+        else:
+            dish = Dish(**fields)
+        new_dishes.append(dish)
+    group.dishes = new_dishes
 
 
 @router.post(
@@ -33,7 +54,8 @@ def create_question_group(payload: GroupIn, db: Session = Depends(get_db)):
         title=payload.title,
         plating_options=payload.plating_options or [],
     )
-    group.dishes = [Dish(**d.model_dump()) for d in payload.dishes]
+    # 新題組沒有既有菜餚可以比對，忽略 payload 帶的 id（若有）直接新建
+    group.dishes = [Dish(**d.model_dump(exclude={"id"})) for d in payload.dishes]
     group.material_items = [MaterialItem(**m.model_dump()) for m in payload.material_items]
     group.knife_work_items = [KnifeWorkItem(**k.model_dump()) for k in payload.knife_work_items]
 
@@ -60,8 +82,10 @@ def update_question_group(code: str, payload: GroupIn, db: Session = Depends(get
     group.title = payload.title
     group.plating_options = payload.plating_options or []
 
-    # MVP 做法：整批覆蓋子項目（cascade delete-orphan 會自動清掉舊資料）
-    group.dishes = [Dish(**d.model_dump()) for d in payload.dishes]
+    # 菜餚用 id 做 upsert，保留既有菜餚的 id（讓已上傳的照片/影片不失聯）
+    _sync_dishes(group, payload.dishes)
+
+    # 材料清點、刀工規格底下沒有掛媒體，維持 MVP 做法：整批覆蓋
     group.material_items = [MaterialItem(**m.model_dump()) for m in payload.material_items]
     group.knife_work_items = [KnifeWorkItem(**k.model_dump()) for k in payload.knife_work_items]
 

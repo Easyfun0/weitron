@@ -1,4 +1,11 @@
-"""建立後台管理員帳號。用法： python -m app.create_admin <username> <password>"""
+"""
+建立／重設後台管理員帳號。
+用法： python -m app.create_admin <username> <password>
+
+若帳號已存在，會更新密碼（可用來重設固定帳密，如 admin / 123456）；
+若帳號不存在，則新增一筆。之後要再新增其他管理員，重複執行本指令並換新帳號即可，
+不會影響既有帳號。
+"""
 import sys
 
 from app.db import SessionLocal, Base, engine
@@ -10,13 +17,16 @@ def create_admin(username: str, password: str):
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
-        if db.query(AdminUser).filter(AdminUser.username == username).first():
-            print(f"帳號 {username} 已存在")
-            return
-        user = AdminUser(username=username, password_hash=hash_password(password))
-        db.add(user)
-        db.commit()
-        print(f"已建立管理員帳號：{username}")
+        user = db.query(AdminUser).filter(AdminUser.username == username).first()
+        if user:
+            user.password_hash = hash_password(password)
+            db.commit()
+            print(f"已重設帳號 {username} 的密碼")
+        else:
+            user = AdminUser(username=username, password_hash=hash_password(password))
+            db.add(user)
+            db.commit()
+            print(f"已建立管理員帳號：{username}")
     finally:
         db.close()
 

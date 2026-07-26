@@ -2,6 +2,7 @@ fastapi==0.115.6
 uvicorn[standard]==0.34.0
 sqlalchemy==2.0.36
 alembic==1.14.0
+psycopg2-binary==2.9.10  # 本地開發用不到，雲端切換成 PostgreSQL 時的驅動，先裝起來備用
 pydantic==2.10.4
 pydantic-settings==2.7.0
 python-jose[cryptography]==3.3.0

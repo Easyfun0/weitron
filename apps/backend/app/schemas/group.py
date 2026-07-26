@@ -64,6 +64,7 @@ class GroupDetailOut(BaseModel):
 
 
 class DishIn(BaseModel):
+    id: Optional[int] = None  # 有值代表更新既有菜餚（保留 id 讓已上傳的照片/影片不會失聯），沒有則視為新菜餚
     name: str
     main_cut: Optional[str] = None
     method: Optional[str] = None

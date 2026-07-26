@@ -15,6 +15,7 @@ router = APIRouter(prefix="/api", tags=["media"])
 ALLOWED_IMAGE = {".jpg", ".jpeg", ".png", ".webp"}
 ALLOWED_VIDEO = {".mp4", ".mov"}
 MAX_VIDEO_BYTES = 100 * 1024 * 1024  # 100MB
+VALID_CATEGORIES = {"step", "finished"}
 
 
 @router.get("/groups/{code}/media", response_model=list[MediaOut])
@@ -39,6 +40,7 @@ async def upload_media(
     owner_type: str = Form(...),
     owner_id: int = Form(...),
     caption: str = Form(""),
+    category: str = Form(None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
@@ -49,6 +51,12 @@ async def upload_media(
         media_type = "video"
     else:
         raise HTTPException(status_code=400, detail="不支援的檔案格式")
+
+    # 分類標籤僅圖片適用（步驟照片／完成圖），影片不需要分類
+    if media_type == "image" and category and category not in VALID_CATEGORIES:
+        raise HTTPException(status_code=400, detail="圖片分類需為 step 或 finished")
+    if media_type == "video":
+        category = None
 
     os.makedirs(settings.upload_dir, exist_ok=True)
     filename = f"{uuid.uuid4().hex}{ext}"
@@ -65,6 +73,7 @@ async def upload_media(
         owner_type=owner_type,
         owner_id=owner_id,
         media_type=media_type,
+        category=category,
         file_url=f"/uploads/{filename}",
         caption=caption,
     )

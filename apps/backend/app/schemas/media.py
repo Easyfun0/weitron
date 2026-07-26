@@ -7,6 +7,7 @@ class MediaOut(BaseModel):
     owner_type: str
     owner_id: int
     media_type: str
+    category: str | None = None
     file_url: str
     caption: str | None = None
     sort_order: int = 0
