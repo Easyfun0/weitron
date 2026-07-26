@@ -1,0 +1,20 @@
+# --- Node / 前端 ---
+node_modules/
+dist/
+.vite/
+
+# --- Python / 後端 ---
+apps/backend/venv/
+apps/backend/__pycache__/
+apps/backend/**/__pycache__/
+apps/backend/*.db
+apps/backend/uploads/*
+!apps/backend/uploads/.gitkeep
+
+# --- 環境變數 ---
+.env
+apps/*/.env
+
+# --- 系統雜項 ---
+.DS_Store
+*.log

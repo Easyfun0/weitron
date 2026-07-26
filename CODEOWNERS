@@ -1,0 +1,5 @@
+# 資料夾層級 code owner，PR 會自動指派對應負責人 review
+# 請將 @frontend-dev / @backend-dev 換成實際 GitHub 帳號
+
+/apps/frontend/  @frontend-dev
+/apps/backend/   @backend-dev
