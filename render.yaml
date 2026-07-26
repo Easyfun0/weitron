@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: weitron-backend
+    runtime: python
+    plan: free
+    rootDir: apps/backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.10
+      - key: DATABASE_URL
+        sync: false # 貼上 Supabase 的 PostgreSQL 連線字串
+      - key: JWT_SECRET_KEY
+        generateValue: true # Render 會自動產生一組隨機值
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: JWT_EXPIRE_MINUTES
+        value: "120"
+      - key: UPLOAD_DIR
+        value: ./uploads
+      - key: CORS_ORIGINS
+        sync: false # 貼上 Vercel 網域，例如 https://your-app.vercel.app（本地開發不受影響）
