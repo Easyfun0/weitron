@@ -1,0 +1,18 @@
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy.sql import func
+
+from app.db import Base
+
+
+class Media(Base):
+    __tablename__ = "media"
+
+    id = Column(Integer, primary_key=True)
+    owner_type = Column(String(20), nullable=False)  # "group" | "dish"
+    owner_id = Column(Integer, nullable=False)
+    media_type = Column(String(10), nullable=False)  # "image" | "video"
+    file_url = Column(String(500), nullable=False)
+    caption = Column(String(255))
+    sort_order = Column(Integer, default=0)
+    uploaded_by = Column(Integer, ForeignKey("admin_user.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
