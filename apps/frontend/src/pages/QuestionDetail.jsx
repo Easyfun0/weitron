@@ -1,23 +1,14 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import {
-  getGroup,
-  getGroupMedia,
-  uploadMedia,
-  getMediaUrl,
-} from "../services/api.js";
+import { useParams } from "react-router-dom";
+import { getGroup, getGroupMedia } from "../services/api.js";
+import DishMediaPanel from "../components/DishMediaPanel.jsx";
 
-// 題組詳情頁：烹調指引 / 材料清點 / 刀工規格 三分頁 + 操作影片區塊
+// 題組詳情頁：烹調指引（含每道菜的步驟照片/完成圖/影片） / 材料清點 / 刀工規格 三分頁
 export default function QuestionDetail() {
   const { id: code } = useParams();
   const [group, setGroup] = useState(null);
   const [tab, setTab] = useState("dishes");
-
-  const [videos, setVideos] = useState([]);
-  const [file, setFile] = useState(null);
-  const [caption, setCaption] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState(null);
+  const [media, setMedia] = useState([]);
 
   const isAdmin = !!localStorage.getItem("admin_token");
 
@@ -26,40 +17,13 @@ export default function QuestionDetail() {
   }, [code]);
 
   const loadMedia = () => {
-    getGroupMedia(code).then((res) =>
-      setVideos(res.data.filter((m) => m.media_type === "video"))
-    );
+    getGroupMedia(code).then((res) => setMedia(res.data));
   };
 
   useEffect(() => {
     loadMedia();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
-
-  const handleUpload = async (e) => {
-    e.preventDefault();
-    if (!file || !group) return;
-    setUploadError(null);
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("owner_type", "group");
-      formData.append("owner_id", group.id);
-      formData.append("caption", caption);
-      formData.append("file", file);
-      await uploadMedia(formData);
-      setFile(null);
-      setCaption("");
-      e.target.reset();
-      loadMedia();
-    } catch (err) {
-      setUploadError(
-        err.response?.data?.detail || "上傳失敗，請確認檔案格式與大小"
-      );
-    } finally {
-      setUploading(false);
-    }
-  };
 
   if (!group) return <p className="p-4">載入中...</p>;
 
@@ -117,6 +81,13 @@ export default function QuestionDetail() {
               {d.notes && (
                 <p className="text-sm text-red-500 mt-1">備註：{d.notes}</p>
               )}
+
+              <DishMediaPanel
+                dishId={d.id}
+                allMedia={media}
+                onChanged={loadMedia}
+                canManage={isAdmin}
+              />
             </div>
           ))}
         </div>
@@ -153,61 +124,6 @@ export default function QuestionDetail() {
           )}
         </div>
       )}
-
-      <div className="mt-8 pt-6 border-t">
-        <h2 className="font-bold mb-3">操作影片</h2>
-
-        {videos.length === 0 && (
-          <p className="text-sm text-gray-400 mb-4">尚無操作影片</p>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          {videos.map((v) => (
-            <div key={v.id}>
-              <video
-                controls
-                className="w-full rounded border"
-                src={getMediaUrl(v.file_url)}
-              />
-              {v.caption && (
-                <p className="text-xs text-gray-500 mt-1">{v.caption}</p>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {isAdmin && (
-          <form
-            onSubmit={handleUpload}
-            className="border rounded p-3 space-y-2 text-sm max-w-sm"
-          >
-            <p className="font-medium">新增操作影片（管理員）</p>
-            {uploadError && <p className="text-red-500">{uploadError}</p>}
-            <input
-              type="file"
-              accept="video/mp4,video/quicktime"
-              onChange={(e) => setFile(e.target.files[0])}
-              className="block w-full text-sm"
-            />
-            <input
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              placeholder="影片說明（選填）"
-              className="w-full border rounded px-2 py-1"
-            />
-            <button
-              type="submit"
-              disabled={uploading || !file}
-              className="bg-blue-600 text-white px-3 py-1.5 rounded disabled:opacity-50"
-            >
-              {uploading ? "上傳中..." : "上傳影片"}
-            </button>
-            <p className="text-xs text-gray-400">
-              限 mp4 / mov 格式，檔案大小上限 100MB
-            </p>
-          </form>
-        )}
-      </div>
     </div>
   );
 }

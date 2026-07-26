@@ -5,12 +5,11 @@ import {
   createQuestionGroup,
   updateQuestionGroup,
   getGroupMedia,
-  uploadMedia,
-  deleteMedia,
-  getMediaUrl,
 } from '../../services/api.js'
+import DishMediaPanel from '../../components/DishMediaPanel.jsx'
 
 const emptyDish = () => ({
+  id: null,
   name: '',
   main_cut: '',
   method: '',
@@ -44,22 +43,15 @@ export default function QuestionEditor() {
     knife_work_items: [],
     plating_options: [],
   })
-  const [groupDbId, setGroupDbId] = useState(null)
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
-
   const [media, setMedia] = useState([])
-  const [mediaFile, setMediaFile] = useState(null)
-  const [mediaCaption, setMediaCaption] = useState('')
-  const [mediaUploading, setMediaUploading] = useState(false)
-  const [mediaError, setMediaError] = useState(null)
 
-  useEffect(() => {
+  const loadGroup = () => {
     if (isNew) return
     getGroup(id).then((res) => {
       const g = res.data
-      setGroupDbId(g.id)
       setForm({
         code: g.code,
         title: g.title,
@@ -70,7 +62,8 @@ export default function QuestionEditor() {
       })
       setLoading(false)
     })
-  }, [id, isNew])
+  }
+  useEffect(loadGroup, [id, isNew])
 
   const loadMedia = () => {
     if (isNew) return
@@ -106,9 +99,19 @@ export default function QuestionEditor() {
         const res = await createQuestionGroup(form)
         navigate(`/admin/questions/${res.data.code}`)
       } else {
-        await updateQuestionGroup(id, form)
+        const res = await updateQuestionGroup(id, form)
         if (form.code !== id) {
           navigate(`/admin/questions/${form.code}`)
+        } else {
+          // 儲存後重新載入，讓新增的菜餚拿到後端配的 id，才能繼續上傳照片/影片
+          setForm({
+            code: res.data.code,
+            title: res.data.title,
+            dishes: res.data.dishes.length ? res.data.dishes : [emptyDish()],
+            material_items: res.data.material_items,
+            knife_work_items: res.data.knife_work_items,
+            plating_options: res.data.plating_options || [],
+          })
         }
       }
     } catch (err) {
@@ -116,34 +119,6 @@ export default function QuestionEditor() {
     } finally {
       setSaving(false)
     }
-  }
-
-  const handleMediaUpload = async (e) => {
-    e.preventDefault()
-    if (!mediaFile || !groupDbId) return
-    setMediaError(null)
-    setMediaUploading(true)
-    try {
-      const formData = new FormData()
-      formData.append('owner_type', 'group')
-      formData.append('owner_id', groupDbId)
-      formData.append('caption', mediaCaption)
-      formData.append('file', mediaFile)
-      await uploadMedia(formData)
-      setMediaFile(null)
-      setMediaCaption('')
-      e.target.reset()
-      loadMedia()
-    } catch (err) {
-      setMediaError(err.response?.data?.detail || '上傳失敗，請確認檔案格式與大小')
-    } finally {
-      setMediaUploading(false)
-    }
-  }
-
-  const handleMediaDelete = async (mediaId) => {
-    await deleteMedia(mediaId)
-    loadMedia()
   }
 
   if (loading) return <p>載入中...</p>
@@ -175,7 +150,7 @@ export default function QuestionEditor() {
           </div>
         </div>
 
-        {/* 菜餚 / 烹調指引 */}
+        {/* 菜餚 / 烹調指引 + 每道菜的照片影片 */}
         <section>
           <div className="flex justify-between items-center mb-2">
             <h2 className="font-medium">菜餚（烹調指引）</h2>
@@ -252,6 +227,14 @@ export default function QuestionEditor() {
                   placeholder="備註（扣分標準等）"
                   className="w-full border rounded px-2 py-1 text-sm"
                 />
+
+                {d.id ? (
+                  <DishMediaPanel dishId={d.id} allMedia={media} onChanged={loadMedia} canManage />
+                ) : (
+                  <p className="text-xs text-gray-400 mt-2 pt-2 border-t">
+                    請先儲存題組後，才能上傳這道菜的步驟照片／完成圖／影片
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -378,63 +361,6 @@ export default function QuestionEditor() {
           {saving ? '儲存中...' : '儲存題組'}
         </button>
       </form>
-
-      {/* 媒體上傳：新增題組時尚未有 group id，需先儲存一次才能上傳 */}
-      <section className="mt-8 pt-6 border-t">
-        <h2 className="font-medium mb-2">參考圖片／教學影片</h2>
-        {isNew ? (
-          <p className="text-sm text-gray-400">請先儲存題組後再上傳媒體檔案</p>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-              {media.map((m) => (
-                <div key={m.id} className="border rounded p-2">
-                  {m.media_type === 'video' ? (
-                    <video controls className="w-full rounded" src={getMediaUrl(m.file_url)} />
-                  ) : (
-                    <img className="w-full rounded" src={getMediaUrl(m.file_url)} alt={m.caption || ''} />
-                  )}
-                  {m.caption && <p className="text-xs text-gray-500 mt-1">{m.caption}</p>}
-                  <button
-                    type="button"
-                    onClick={() => handleMediaDelete(m.id)}
-                    className="text-xs text-red-500 mt-1"
-                  >
-                    刪除
-                  </button>
-                </div>
-              ))}
-              {media.length === 0 && <p className="text-sm text-gray-400">尚無媒體檔案</p>}
-            </div>
-
-            <form onSubmit={handleMediaUpload} className="border rounded p-3 space-y-2 text-sm max-w-sm">
-              {mediaError && <p className="text-red-500">{mediaError}</p>}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime"
-                onChange={(e) => setMediaFile(e.target.files[0])}
-                className="block w-full text-sm"
-              />
-              <input
-                value={mediaCaption}
-                onChange={(e) => setMediaCaption(e.target.value)}
-                placeholder="說明文字（選填）"
-                className="w-full border rounded px-2 py-1"
-              />
-              <button
-                type="submit"
-                disabled={mediaUploading || !mediaFile}
-                className="bg-blue-600 text-white px-3 py-1.5 rounded disabled:opacity-50"
-              >
-                {mediaUploading ? '上傳中...' : '上傳'}
-              </button>
-              <p className="text-xs text-gray-400">
-                支援 jpg / png / webp 圖片，或 mp4 / mov 影片（上限 100MB）
-              </p>
-            </form>
-          </>
-        )}
-      </section>
     </div>
   )
 }
