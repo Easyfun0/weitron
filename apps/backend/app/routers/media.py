@@ -26,6 +26,9 @@ async def _upload_to_supabase(filename: str, content: bytes, content_type: str) 
     """
     url = f"{settings.supabase_url}/storage/v1/object/{settings.supabase_storage_bucket}/{filename}"
     headers = {
+        # 新版 sb_secret_... 金鑰不能只放 Authorization，會被誤判成 JWT 解析失敗（Invalid Compact JWS）。
+        # apikey 跟 Authorization 兩邊放同一組值才是 Supabase 目前支援的用法。
+        "apikey": settings.supabase_service_role_key,
         "Authorization": f"Bearer {settings.supabase_service_role_key}",
         "Content-Type": content_type or "application/octet-stream",
     }
@@ -38,7 +41,10 @@ async def _upload_to_supabase(filename: str, content: bytes, content_type: str) 
 
 async def _delete_from_supabase(filename: str) -> None:
     url = f"{settings.supabase_url}/storage/v1/object/{settings.supabase_storage_bucket}/{filename}"
-    headers = {"Authorization": f"Bearer {settings.supabase_service_role_key}"}
+    headers = {
+        "apikey": settings.supabase_service_role_key,
+        "Authorization": f"Bearer {settings.supabase_service_role_key}",
+    }
     async with httpx.AsyncClient(timeout=30) as client:
         # 刪除失敗不擋流程，媒體紀錄照常從資料庫移除，最多留下孤兒檔案
         await client.delete(url, headers=headers)
