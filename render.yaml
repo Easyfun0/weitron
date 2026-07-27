@@ -21,3 +21,9 @@ services:
         value: ./uploads
       - key: CORS_ORIGINS
         sync: false # 貼上 Vercel 網域，例如 https://your-app.vercel.app（本地開發不受影響）
+      - key: SUPABASE_URL
+        sync: false # 例如 https://iqfpsituvyryhvpyqoea.supabase.co
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false # Supabase 後台 Project Settings > API 的 service_role key，絕對不能外流
+      - key: SUPABASE_STORAGE_BUCKET
+        value: media

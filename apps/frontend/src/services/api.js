@@ -29,8 +29,10 @@ export const uploadMedia = (formData) =>
   })
 export const deleteMedia = (mediaId) => api.delete(`/admin/media/${mediaId}`)
 
-// 影片/圖片實際檔案由後端 /uploads 靜態目錄提供，跟 /api 不同路徑，需去掉 baseURL 的 /api 後綴組合網址
+// 正式環境圖片/影片存在 Supabase Storage，file_url 本身就是完整網址，直接回傳即可；
+// 本地開發沒設定 Supabase 時，後端還是走 /uploads 靜態目錄，回傳的是相對路徑，要補上後端網址
 const API_ORIGIN = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/api\/?$/, '')
-export const getMediaUrl = (fileUrl) => `${API_ORIGIN}${fileUrl}`
+export const getMediaUrl = (fileUrl) =>
+  fileUrl.startsWith('http://') || fileUrl.startsWith('https://') ? fileUrl : `${API_ORIGIN}${fileUrl}`
 
 export default api
