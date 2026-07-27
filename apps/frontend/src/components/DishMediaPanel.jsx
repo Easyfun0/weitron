@@ -63,6 +63,7 @@ export default function DishMediaPanel({
   const [category, setCategory] = useState("step");
   const [caption, setCaption] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState(null);
 
   const isImageFile = file && file.type.startsWith("image/");
@@ -73,6 +74,7 @@ export default function DishMediaPanel({
     if (!file) return;
     setError(null);
     setUploading(true);
+    setUploadProgress(0);
     try {
       const formData = new FormData();
       formData.append("owner_type", "dish");
@@ -80,7 +82,10 @@ export default function DishMediaPanel({
       formData.append("caption", caption);
       if (isImageFile) formData.append("category", category);
       formData.append("file", file);
-      await uploadMedia(formData);
+      await uploadMedia(formData, (progressEvent) => {
+        if (!progressEvent.total) return;
+        setUploadProgress(Math.round((progressEvent.loaded / progressEvent.total) * 100));
+      });
       setFile(null);
       setCaption("");
       e.target.reset();
@@ -89,10 +94,12 @@ export default function DishMediaPanel({
       setError(err.response?.data?.detail || "上傳失敗，請確認檔案格式與大小");
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
   const handleDelete = async (mediaId) => {
+    if (!confirm("確定要刪除這個檔案嗎？此動作無法復原。")) return;
     await deleteMedia(mediaId);
     onChanged();
   };
@@ -135,12 +142,14 @@ export default function DishMediaPanel({
             type="file"
             accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime"
             onChange={(e) => setFile(e.target.files[0])}
+            disabled={uploading}
           />
           {isImageFile && (
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               className="border rounded px-1.5 py-1"
+              disabled={uploading}
             >
               <option value="step">步驟照片</option>
               <option value="finished">完成圖</option>
@@ -151,14 +160,23 @@ export default function DishMediaPanel({
             onChange={(e) => setCaption(e.target.value)}
             placeholder="說明（選填）"
             className="border rounded px-2 py-1 flex-1 min-w-[100px]"
+            disabled={uploading}
           />
           <button
             type="submit"
             disabled={uploading || !file}
-            className="bg-blue-600 text-white px-2.5 py-1 rounded disabled:opacity-50"
+            className="bg-blue-600 text-white px-2.5 py-1 rounded disabled:opacity-50 min-w-[72px]"
           >
-            {uploading ? "上傳中..." : "上傳"}
+            {uploading ? `上傳中 ${uploadProgress}%` : "上傳"}
           </button>
+          {uploading && (
+            <div className="w-full h-1.5 bg-gray-200 rounded overflow-hidden">
+              <div
+                className="h-full bg-blue-600 transition-all"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+          )}
         </form>
       )}
     </div>

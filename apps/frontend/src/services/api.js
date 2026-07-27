@@ -23,9 +23,10 @@ export const createQuestionGroup = (payload) => api.post('/admin/questions', pay
 export const updateQuestionGroup = (code, payload) => api.put(`/admin/questions/${code}`, payload)
 export const deleteQuestionGroup = (code) => api.delete(`/admin/questions/${code}`)
 
-export const uploadMedia = (formData) =>
+export const uploadMedia = (formData, onUploadProgress) =>
   api.post('/admin/media', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress,
   })
 export const deleteMedia = (mediaId) => api.delete(`/admin/media/${mediaId}`)
 

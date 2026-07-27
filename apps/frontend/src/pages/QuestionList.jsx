@@ -11,7 +11,15 @@ export default function QuestionList() {
 
   useEffect(() => {
     getGroups()
-      .then((res) => setGroups(res.data))
+      .then((res) => {
+        if (Array.isArray(res.data)) {
+          setGroups(res.data)
+        } else {
+          // 後端回傳的不是陣列（例如錯誤訊息物件），避免下面 .filter 直接炸掉
+          setGroups([])
+          setError('後端回傳格式異常，請確認 API 是否正常')
+        }
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }, [])
