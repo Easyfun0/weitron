@@ -1,47 +1,11 @@
 import { useState } from "react";
-import { uploadMedia, deleteMedia, getMediaUrl } from "../services/api.js";
+import { uploadMedia, deleteMedia } from "../services/api.js";
+import MediaGrid from "./MediaGrid.jsx";
 
-function MediaGrid({ label, items, onDelete, isVideo, canDelete }) {
-  if (items.length === 0) return null;
-  return (
-    <div>
-      <p className="text-xs text-gray-500 mb-1">
-        {label}（{items.length}）
-      </p>
-      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-        {items.map((m) => (
-          <div key={m.id} className="relative">
-            {isVideo ? (
-              <video
-                controls
-                className="w-full object-cover rounded border"
-                src={getMediaUrl(m.file_url)}
-              />
-            ) : (
-              <img
-                className="w-full object-cover rounded border"
-                src={getMediaUrl(m.file_url)}
-                alt={m.caption || ""}
-              />
-            )}
-            {canDelete && (
-              <button
-                type="button"
-                onClick={() => onDelete(m.id)}
-                className="absolute top-0.5 right-0.5 bg-red-500 text-white text-xs leading-none rounded px-1 py-0.5"
-              >
-                ×
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// 單一菜餚底下的照片／影片：步驟照片、完成圖、操作影片，皆不限張數
-// canManage=false 時只顯示、不提供上傳/刪除（給學員端使用）
+// 單一菜餚底下「導師範例」的照片／影片：步驟照片、完成圖、操作影片，皆不限張數。
+// 這是管理員上傳的公開示範內容，任何人（含未登入）都能看到；
+// 學員自己上傳的私人照片/影片走 StudentMediaPanel，不會混在這裡。
+// canManage=false 時只顯示、不提供上傳/刪除（給非管理員瀏覽用）
 export default function DishMediaPanel({
   dishId,
   allMedia,
@@ -49,7 +13,7 @@ export default function DishMediaPanel({
   canManage = false,
 }) {
   const items = allMedia.filter(
-    (m) => m.owner_type === "dish" && m.owner_id === dishId,
+    (m) => m.owner_type === "dish" && m.owner_id === dishId && m.student_id == null,
   );
   const stepPhotos = items.filter(
     (m) => m.media_type === "image" && m.category === "step",
@@ -108,9 +72,9 @@ export default function DishMediaPanel({
 
   return (
     <div className="mt-3 pt-3 border-t space-y-2">
-      <p className="text-xs font-medium text-gray-600">照片／影片</p>
+      <p className="text-xs font-medium text-gray-600">導師範例照片／影片</p>
 
-      {!hasAnyMedia && <p className="text-xs text-gray-400">尚無照片／影片</p>}
+      {!hasAnyMedia && <p className="text-xs text-gray-400">尚無導師範例</p>}
 
       <MediaGrid
         label="步驟照片"

@@ -5,7 +5,7 @@ export default function AdminLayout({ children }) {
   const navigate = useNavigate()
   const token = localStorage.getItem('admin_token')
   if (!token) {
-    return <Navigate to="/admin/login" replace />
+    return <Navigate to="/login" replace />
   }
 
   const handleLogout = () => {

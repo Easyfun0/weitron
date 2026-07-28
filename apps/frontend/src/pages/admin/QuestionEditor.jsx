@@ -7,6 +7,7 @@ import {
   getGroupMedia,
 } from '../../services/api.js'
 import DishMediaPanel from '../../components/DishMediaPanel.jsx'
+import GroupReferenceImages from '../../components/GroupReferenceImages.jsx'
 
 const emptyDish = () => ({
   id: null,
@@ -18,6 +19,8 @@ const emptyDish = () => ({
   cooking_steps: [],
   seasoning: '',
   notes: '',
+  has_water_flower: false,
+  has_plating: false,
 })
 
 const emptyMaterial = () => ({ name: '', spec: '', qty: '', note: '' })
@@ -47,11 +50,14 @@ export default function QuestionEditor() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [media, setMedia] = useState([])
+  // 題組的數字 id（跟路徑上的 code 不同），水花/盤飾參考圖上傳要用這個當 owner_id
+  const [groupId, setGroupId] = useState(null)
 
   const loadGroup = () => {
     if (isNew) return
     getGroup(id).then((res) => {
       const g = res.data
+      setGroupId(g.id)
       setForm({
         code: g.code,
         title: g.title,
@@ -104,6 +110,7 @@ export default function QuestionEditor() {
           navigate(`/admin/questions/${form.code}`)
         } else {
           // 儲存後重新載入，讓新增的菜餚拿到後端配的 id，才能繼續上傳照片/影片
+          setGroupId(res.data.id)
           setForm({
             code: res.data.code,
             title: res.data.title,
@@ -227,6 +234,24 @@ export default function QuestionEditor() {
                   placeholder="備註（扣分標準等）"
                   className="w-full border rounded px-2 py-1 text-sm"
                 />
+                <div className="flex gap-4 text-sm">
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={!!d.has_water_flower}
+                      onChange={(e) => updateListItem('dishes', i, 'has_water_flower', e.target.checked)}
+                    />
+                    這道菜要參考水花指定圖
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={!!d.has_plating}
+                      onChange={(e) => updateListItem('dishes', i, 'has_plating', e.target.checked)}
+                    />
+                    這道菜要參考盤飾指定圖
+                  </label>
+                </div>
 
                 {d.id ? (
                   <DishMediaPanel dishId={d.id} allMedia={media} onChanged={loadMedia} canManage />
@@ -340,6 +365,21 @@ export default function QuestionEditor() {
               </div>
             ))}
           </div>
+
+          {groupId ? (
+            <GroupReferenceImages
+              groupId={groupId}
+              category="water_flower"
+              label="水花參考圖"
+              allMedia={media}
+              onChanged={loadMedia}
+              canManage
+            />
+          ) : (
+            <p className="text-xs text-gray-400 mt-2 pt-2 border-t">
+              請先儲存題組後，才能上傳水花參考圖
+            </p>
+          )}
         </section>
 
         {/* 指定盤飾 */}
@@ -351,6 +391,21 @@ export default function QuestionEditor() {
             rows={3}
             className="w-full border rounded px-2 py-1 text-sm"
           />
+
+          {groupId ? (
+            <GroupReferenceImages
+              groupId={groupId}
+              category="plating"
+              label="盤飾參考圖"
+              allMedia={media}
+              onChanged={loadMedia}
+              canManage
+            />
+          ) : (
+            <p className="text-xs text-gray-400 mt-2 pt-2 border-t">
+              請先儲存題組後，才能上傳盤飾參考圖
+            </p>
+          )}
         </section>
 
         <button
