@@ -11,6 +11,7 @@ class MediaOut(BaseModel):
     file_url: str
     caption: str | None = None
     sort_order: int = 0
+    student_id: int | None = None
     created_at: datetime
 
     class Config:

@@ -7,9 +7,9 @@ from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import Media, QuestionGroup, Dish
+from app.models import Media, QuestionGroup, Dish, Student
 from app.schemas.media import MediaOut
-from app.auth.jwt_handler import get_current_admin
+from app.auth.jwt_handler import get_current_admin, get_current_student, get_optional_student
 from app.config import settings
 
 router = APIRouter(prefix="/api", tags=["media"])
@@ -17,7 +17,9 @@ router = APIRouter(prefix="/api", tags=["media"])
 ALLOWED_IMAGE = {".jpg", ".jpeg", ".png", ".webp"}
 ALLOWED_VIDEO = {".mp4", ".mov"}
 MAX_VIDEO_BYTES = 100 * 1024 * 1024  # 100MB
-VALID_CATEGORIES = {"step", "finished"}
+# step/finished：菜餚的步驟照片／完成圖；water_flower/plating：題組層級的水花參考圖／盤飾參考圖
+# （對應刀工作品規格卡上「指定圖」的部分，掛在 owner_type="group" 底下）
+VALID_CATEGORIES = {"step", "finished", "water_flower", "plating"}
 
 
 async def _upload_to_supabase(filename: str, content: bytes, content_type: str) -> str:
@@ -50,32 +52,10 @@ async def _delete_from_supabase(filename: str) -> None:
         await client.delete(url, headers=headers)
 
 
-@router.get("/groups/{code}/media", response_model=list[MediaOut])
-def get_group_media(code: str, db: Session = Depends(get_db)):
-    group = db.query(QuestionGroup).filter(QuestionGroup.code == code).first()
-    if not group:
-        raise HTTPException(status_code=404, detail="題組不存在")
-    dish_ids = [d.id for d in group.dishes]
-    return (
-        db.query(Media)
-        .filter(
-            ((Media.owner_type == "group") & (Media.owner_id == group.id))
-            | ((Media.owner_type == "dish") & (Media.owner_id.in_(dish_ids)))
-        )
-        .order_by(Media.sort_order)
-        .all()
-    )
-
-
-@router.post("/admin/media", response_model=MediaOut, dependencies=[Depends(get_current_admin)])
-async def upload_media(
-    owner_type: str = Form(...),
-    owner_id: int = Form(...),
-    caption: str = Form(""),
-    category: str = Form(None),
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-):
+async def _validate_and_store_file(file: UploadFile, category: str | None) -> tuple[str, str | None, str]:
+    """驗證檔案格式/大小、存到 Supabase Storage 或本地磁碟，回傳 (media_type, category, file_url)。
+    管理員上傳（導師範例）跟學員上傳（自己的照片/影片）共用這段邏輯。
+    """
     ext = os.path.splitext(file.filename)[1].lower()
     if ext in ALLOWED_IMAGE:
         media_type = "image"
@@ -108,6 +88,67 @@ async def upload_media(
             f.write(content)
         file_url = f"/uploads/{filename}"
 
+    return media_type, category, file_url
+
+
+async def _delete_stored_file(media: Media) -> None:
+    if settings.use_supabase_storage and media.file_url.startswith(settings.supabase_url):
+        filename = media.file_url.rsplit("/", 1)[-1]
+        await _delete_from_supabase(filename)
+    elif media.file_url.startswith("/uploads/"):
+        local_path = os.path.join(settings.upload_dir, media.file_url[len("/uploads/"):])
+        if os.path.exists(local_path):
+            os.remove(local_path)
+
+
+@router.get("/groups/{code}/media", response_model=list[MediaOut])
+def get_group_media(
+    code: str,
+    db: Session = Depends(get_db),
+    student_username: str | None = Depends(get_optional_student),
+):
+    group = db.query(QuestionGroup).filter(QuestionGroup.code == code).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="題組不存在")
+    dish_ids = [d.id for d in group.dishes]
+
+    owner_filter = (
+        ((Media.owner_type == "group") & (Media.owner_id == group.id))
+        | ((Media.owner_type == "dish") & (Media.owner_id.in_(dish_ids)))
+    )
+
+    current_student_id = None
+    if student_username:
+        student = db.query(Student).filter(Student.username == student_username).first()
+        if student:
+            current_student_id = student.id
+
+    # 導師範例（student_id 是 null）任何人都能看到；學員自己上傳的只有本人登入才看得到，
+    # 其他學員上傳的私人媒體一律不會出現在這裡
+    if current_student_id is not None:
+        visibility_filter = (Media.student_id.is_(None)) | (Media.student_id == current_student_id)
+    else:
+        visibility_filter = Media.student_id.is_(None)
+
+    return (
+        db.query(Media)
+        .filter(owner_filter, visibility_filter)
+        .order_by(Media.sort_order)
+        .all()
+    )
+
+
+@router.post("/admin/media", response_model=MediaOut, dependencies=[Depends(get_current_admin)])
+async def upload_media(
+    owner_type: str = Form(...),
+    owner_id: int = Form(...),
+    caption: str = Form(""),
+    category: str = Form(None),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    media_type, category, file_url = await _validate_and_store_file(file, category)
+
     media = Media(
         owner_type=owner_type,
         owner_id=owner_id,
@@ -128,13 +169,61 @@ async def delete_media(media_id: int, db: Session = Depends(get_db)):
     if not media:
         raise HTTPException(status_code=404, detail="媒體不存在")
 
-    if settings.use_supabase_storage and media.file_url.startswith(settings.supabase_url):
-        filename = media.file_url.rsplit("/", 1)[-1]
-        await _delete_from_supabase(filename)
-    elif media.file_url.startswith("/uploads/"):
-        local_path = os.path.join(settings.upload_dir, media.file_url[len("/uploads/"):])
-        if os.path.exists(local_path):
-            os.remove(local_path)
+    await _delete_stored_file(media)
+
+    db.delete(media)
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/student/media", response_model=MediaOut)
+async def upload_student_media(
+    owner_type: str = Form(...),
+    owner_id: int = Form(...),
+    caption: str = Form(""),
+    category: str = Form(None),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    username: str = Depends(get_current_student),
+):
+    student = db.query(Student).filter(Student.username == username).first()
+    if not student:
+        raise HTTPException(status_code=401, detail="找不到學員帳號")
+
+    media_type, category, file_url = await _validate_and_store_file(file, category)
+
+    media = Media(
+        owner_type=owner_type,
+        owner_id=owner_id,
+        media_type=media_type,
+        category=category,
+        file_url=file_url,
+        caption=caption,
+        student_id=student.id,
+    )
+    db.add(media)
+    db.commit()
+    db.refresh(media)
+    return media
+
+
+@router.delete("/student/media/{media_id}")
+async def delete_student_media(
+    media_id: int,
+    db: Session = Depends(get_db),
+    username: str = Depends(get_current_student),
+):
+    student = db.query(Student).filter(Student.username == username).first()
+    if not student:
+        raise HTTPException(status_code=401, detail="找不到學員帳號")
+
+    media = db.query(Media).get(media_id)
+    if not media:
+        raise HTTPException(status_code=404, detail="媒體不存在")
+    if media.student_id != student.id:
+        raise HTTPException(status_code=403, detail="只能刪除自己上傳的檔案")
+
+    await _delete_stored_file(media)
 
     db.delete(media)
     db.commit()

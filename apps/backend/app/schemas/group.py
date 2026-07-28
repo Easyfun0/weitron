@@ -12,6 +12,8 @@ class DishOut(BaseModel):
     cooking_steps: Optional[list] = None
     seasoning: Optional[str] = None
     notes: Optional[str] = None
+    has_water_flower: bool = False
+    has_plating: bool = False
 
     class Config:
         from_attributes = True
@@ -73,6 +75,8 @@ class DishIn(BaseModel):
     cooking_steps: Optional[list[str]] = []
     seasoning: Optional[str] = None
     notes: Optional[str] = None
+    has_water_flower: bool = False
+    has_plating: bool = False
 
 
 class MaterialItemIn(BaseModel):

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, JSON, Boolean
 from sqlalchemy.orm import relationship
 
 from app.db import Base
@@ -30,6 +30,9 @@ class Dish(Base):
     cooking_steps = Column(JSON)     # list
     seasoning = Column(Text)
     notes = Column(Text)
+    # 對應「菜名與食材切配依據」表最後兩欄：這道菜是否要參考本題組的水花／盤飾指定圖
+    has_water_flower = Column(Boolean, default=False, nullable=False)
+    has_plating = Column(Boolean, default=False, nullable=False)
 
     group = relationship("QuestionGroup", back_populates="dishes")
 

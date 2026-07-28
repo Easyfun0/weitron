@@ -16,4 +16,6 @@ class Media(Base):
     caption = Column(String(255))
     sort_order = Column(Integer, default=0)
     uploaded_by = Column(Integer, ForeignKey("admin_user.id"))
+    # null = 導師範例（管理員上傳，任何人都能看到）；有值 = 該學員自己上傳的照片/影片，只有本人登入才看得到
+    student_id = Column(Integer, ForeignKey("student.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
