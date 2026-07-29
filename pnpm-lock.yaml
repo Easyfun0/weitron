@@ -18,6 +18,7 @@ importers:
       react-dom: ^19.2.7
       react-router-dom: ^7.1.1
       tailwindcss: ^3.4.17
+      typescript: ^5.7.2
       vite: ^8.1.1
     dependencies:
       axios: 1.18.1
@@ -32,6 +33,7 @@ importers:
       oxlint: 1.75.0
       postcss: 8.5.23
       tailwindcss: 3.4.19
+      typescript: 5.9.3
       vite: 8.1.5
 
 packages:
@@ -1422,6 +1424,12 @@ packages:
     requiresBuild: true
     dev: true
     optional: true
+
+  /typescript/5.9.3:
+    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+    dev: true
 
   /update-browserslist-db/1.2.3_browserslist@4.28.7:
     resolution: {integrity: sha512-Js0m9cx+qOgDxo0eMiFGEueWztz+d4+M3rGlmKPT+T4IS/jP4ylw3Nwpu6cpTTP8R1MAC1kF4VbdLt3ARf209w==}
