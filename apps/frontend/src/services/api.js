@@ -19,6 +19,36 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+// token 過期或失效時，後端一律回 401。學員/管理員登入太久沒動作、token 過期後，
+// 畫面右上角原本還是顯示「已登入」，但實際上傳/存筆記都會失敗，使用者搞不清楚發生什麼事。
+// 這裡攔截所有 401，主動清掉失效的 token 並導回登入頁、帶提示，而不是讓它悄悄失敗。
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error.response?.status
+    const url = error.config?.url || ''
+    const isAuthEndpoint =
+      url.startsWith('/auth/login') ||
+      url.startsWith('/student/login') ||
+      url.startsWith('/student/signup') ||
+      url.startsWith('/admin/login')
+
+    if (status === 401 && !isAuthEndpoint) {
+      const isAdminRoute = url.startsWith('/admin')
+      if (isAdminRoute) {
+        localStorage.removeItem('admin_token')
+      } else {
+        localStorage.removeItem('student_token')
+        localStorage.removeItem('student_username')
+      }
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login?expired=1'
+      }
+    }
+    return Promise.reject(error)
+  },
+)
+
 export const getGroups = () => api.get('/groups')
 export const getGroup = (code) => api.get(`/groups/${code}`)
 export const getGroupMedia = (code) => api.get(`/groups/${code}/media`)

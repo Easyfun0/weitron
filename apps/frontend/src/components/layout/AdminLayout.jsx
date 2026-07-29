@@ -1,9 +1,17 @@
+import { useEffect } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { resetFontSize } from '../../utils/fontSize.js'
 
 // 簡易後台驗證守衛：沒有 token 就導回登入頁
 export default function AdminLayout({ children }) {
   const navigate = useNavigate()
   const token = localStorage.getItem('admin_token')
+
+  // 後台一律用標準字級，不受前台「文字大小」設定影響
+  useEffect(() => {
+    resetFontSize()
+  }, [])
+
   if (!token) {
     return <Navigate to="/login" replace />
   }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useLocation, Link } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams, Link } from "react-router-dom";
 import { authLogin, studentSignup } from "../services/api.js";
 
 // 學員跟管理員共用同一個登入入口：登入時後端會回傳 role，
@@ -13,6 +13,8 @@ export default function StudentLogin() {
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const expired = searchParams.get("expired") === "1";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -58,6 +60,11 @@ export default function StudentLogin() {
         <h1 className="font-bold text-lg mb-1">
           {mode === "login" ? "登入" : "註冊"}
         </h1>
+        {expired && !error && (
+          <p className="text-amber-600 text-sm bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+            登入已過期，請重新登入
+          </p>
+        )}
         {error && <p className="text-red-500 text-sm">{error}</p>}
         <input
           value={username}
