@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { uploadMedia, deleteMedia } from "../services/api.js";
 import MediaGrid from "./MediaGrid.jsx";
 
@@ -32,9 +32,9 @@ export default function DishMediaPanel({
 
   const isImageFile = file && file.type.startsWith("image/");
   const hasAnyMedia = items.length > 0;
+  const fileInputRef = useRef(null);
 
-  const handleUpload = async (e) => {
-    e.preventDefault();
+  const handleUpload = async () => {
     if (!file) return;
     setError(null);
     setUploading(true);
@@ -52,7 +52,7 @@ export default function DishMediaPanel({
       });
       setFile(null);
       setCaption("");
-      e.target.reset();
+      if (fileInputRef.current) fileInputRef.current.value = "";
       onChanged();
     } catch (err) {
       setError(err.response?.data?.detail || "上傳失敗，請確認檔案格式與大小");
@@ -97,12 +97,10 @@ export default function DishMediaPanel({
       />
 
       {canManage && (
-        <form
-          onSubmit={handleUpload}
-          className="flex flex-wrap items-center gap-2 text-xs"
-        >
+        <div className="flex flex-wrap items-center gap-2 text-xs">
           {error && <p className="text-red-500 w-full">{error}</p>}
           <input
+            ref={fileInputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime"
             onChange={(e) => setFile(e.target.files[0])}
@@ -127,7 +125,8 @@ export default function DishMediaPanel({
             disabled={uploading}
           />
           <button
-            type="submit"
+            type="button"
+            onClick={handleUpload}
             disabled={uploading || !file}
             className="bg-blue-600 text-white px-2.5 py-1 rounded disabled:opacity-50 min-w-[72px]"
           >
@@ -141,7 +140,7 @@ export default function DishMediaPanel({
               />
             </div>
           )}
-        </form>
+        </div>
       )}
     </div>
   );

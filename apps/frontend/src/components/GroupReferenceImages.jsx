@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { uploadMedia, deleteMedia } from "../services/api.js";
 import MediaGrid from "./MediaGrid.jsx";
 
@@ -23,8 +23,9 @@ export default function GroupReferenceImages({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState(null);
 
-  const handleUpload = async (e) => {
-    e.preventDefault();
+  const fileInputRef = useRef(null);
+
+  const handleUpload = async () => {
     if (!file) return;
     setError(null);
     setUploading(true);
@@ -42,7 +43,7 @@ export default function GroupReferenceImages({
       });
       setFile(null);
       setCaption("");
-      e.target.reset();
+      if (fileInputRef.current) fileInputRef.current.value = "";
       onChanged();
     } catch (err) {
       setError(err.response?.data?.detail || "上傳失敗，請確認檔案格式");
@@ -71,12 +72,10 @@ export default function GroupReferenceImages({
       )}
 
       {canManage && (
-        <form
-          onSubmit={handleUpload}
-          className="flex flex-wrap items-center gap-2 text-xs"
-        >
+        <div className="flex flex-wrap items-center gap-2 text-xs">
           {error && <p className="text-red-500 w-full">{error}</p>}
           <input
+            ref={fileInputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp"
             onChange={(e) => setFile(e.target.files[0])}
@@ -90,7 +89,8 @@ export default function GroupReferenceImages({
             disabled={uploading}
           />
           <button
-            type="submit"
+            type="button"
+            onClick={handleUpload}
             disabled={uploading || !file}
             className="bg-blue-600 text-white px-2.5 py-1 rounded disabled:opacity-50 min-w-[72px]"
           >
@@ -104,7 +104,7 @@ export default function GroupReferenceImages({
               />
             </div>
           )}
-        </form>
+        </div>
       )}
     </div>
   );
