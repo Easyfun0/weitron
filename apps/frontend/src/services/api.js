@@ -61,6 +61,8 @@ export const studentSignup = (username, password) => api.post('/student/signup',
 export const getNote = (dishId) => api.get(`/notes/dish/${dishId}`)
 export const saveNote = (dishId, content) => api.put(`/notes/dish/${dishId}`, { content })
 
+export const getStudents = () => api.get('/admin/students')
+
 export const createQuestionGroup = (payload) => api.post('/admin/questions', payload)
 export const updateQuestionGroup = (code, payload) => api.put(`/admin/questions/${code}`, payload)
 export const deleteQuestionGroup = (code) => api.delete(`/admin/questions/${code}`)

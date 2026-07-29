@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import AdminUser, QuestionGroup, Dish, MaterialItem, KnifeWorkItem
+from app.models import AdminUser, QuestionGroup, Dish, MaterialItem, KnifeWorkItem, Student
 from app.schemas.admin import LoginRequest, TokenResponse
 from app.schemas.group import GroupIn, GroupDetailOut, DishIn
 from app.auth.jwt_handler import verify_password, create_access_token, get_current_admin
@@ -17,6 +17,16 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="帳號或密碼錯誤")
     token = create_access_token(subject=user.username, role="admin")
     return TokenResponse(access_token=token)
+
+
+@router.get("/students", dependencies=[Depends(get_current_admin)])
+def list_students(db: Session = Depends(get_db)):
+    """學員註冊清單：後台顯示總人數 + 帳號列表用，不含密碼資訊。"""
+    students = db.query(Student).order_by(Student.id).all()
+    return {
+        "total": len(students),
+        "students": [{"id": s.id, "username": s.username} for s in students],
+    }
 
 
 def _sync_dishes(group: QuestionGroup, dishes_in: list[DishIn]) -> None:

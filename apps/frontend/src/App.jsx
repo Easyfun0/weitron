@@ -7,6 +7,7 @@ import QuestionDetail from './pages/QuestionDetail.jsx'
 import PracticeMode from './pages/PracticeMode.jsx'
 import QuestionManage from './pages/admin/QuestionManage.jsx'
 import QuestionEditor from './pages/admin/QuestionEditor.jsx'
+import StudentList from './pages/admin/StudentList.jsx'
 import Login from './pages/StudentLogin.jsx'
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
 
         <Route path="/admin/questions" element={<AdminLayout><QuestionManage /></AdminLayout>} />
         <Route path="/admin/questions/:id" element={<AdminLayout><QuestionEditor /></AdminLayout>} />
+        <Route path="/admin/students" element={<AdminLayout><StudentList /></AdminLayout>} />
       </Routes>
     </div>
   )
