@@ -2,6 +2,7 @@ import os
 import uuid
 import mimetypes
 
+import boto3
 import httpx
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from sqlalchemy.orm import Session
@@ -16,10 +17,48 @@ router = APIRouter(prefix="/api", tags=["media"])
 
 ALLOWED_IMAGE = {".jpg", ".jpeg", ".png", ".webp"}
 ALLOWED_VIDEO = {".mp4", ".mov"}
-MAX_VIDEO_BYTES = 100 * 1024 * 1024  # 100MB
+# Supabase Free 方案 Storage 全域上限是 50MB，超過會被 Supabase 那邊擋掉（不是我們的問題）；
+# S3 沒有這種單檔上限，所以走 S3 時放寬到 500MB。本地開發也用寬鬆上限，方便測試。
+MAX_VIDEO_BYTES_SUPABASE = 45 * 1024 * 1024
+MAX_VIDEO_BYTES_S3_OR_LOCAL = 500 * 1024 * 1024
 # step/finished：菜餚的步驟照片／完成圖；water_flower/plating：題組層級的水花參考圖／盤飾參考圖
 # （對應刀工作品規格卡上「指定圖」的部分，掛在 owner_type="group" 底下）
 VALID_CATEGORIES = {"step", "finished", "water_flower", "plating"}
+
+
+def _s3_client():
+    return boto3.client(
+        "s3",
+        region_name=settings.aws_region,
+        aws_access_key_id=settings.aws_access_key_id,
+        aws_secret_access_key=settings.aws_secret_access_key,
+    )
+
+
+def _upload_to_s3(filename: str, content: bytes, content_type: str) -> str:
+    """上傳到 AWS S3，回傳可公開存取的完整 URL。
+    boto3 是同步 API，這裡直接同步呼叫（檔案上傳本來就不是高併發場景，可接受）。
+    """
+    # 注意：不用 ACL="public-read"，因為 2023 年後新建的 S3 bucket 預設關閉 ACL
+    # （Object Ownership = Bucket owner enforced），指定 ACL 反而會直接報錯。
+    # 公開讀取改用 bucket policy 設定（見 README／建置說明），這裡只單純上傳檔案。
+    client = _s3_client()
+    client.put_object(
+        Bucket=settings.aws_s3_bucket,
+        Key=filename,
+        Body=content,
+        ContentType=content_type or "application/octet-stream",
+    )
+    return f"https://{settings.aws_s3_bucket}.s3.{settings.aws_region}.amazonaws.com/{filename}"
+
+
+def _delete_from_s3(filename: str) -> None:
+    client = _s3_client()
+    # 刪除失敗不擋流程，媒體紀錄照常從資料庫移除，最多留下孤兒檔案（跟 Supabase 那邊做法一致）
+    try:
+        client.delete_object(Bucket=settings.aws_s3_bucket, Key=filename)
+    except Exception:
+        pass
 
 
 async def _upload_to_supabase(filename: str, content: bytes, content_type: str) -> str:
@@ -70,18 +109,25 @@ async def _validate_and_store_file(file: UploadFile, category: str | None) -> tu
     if media_type == "video":
         category = None
 
+    max_video_bytes = MAX_VIDEO_BYTES_SUPABASE if (settings.use_supabase_storage and not settings.use_s3_storage) else MAX_VIDEO_BYTES_S3_OR_LOCAL
     content = await file.read()
-    if media_type == "video" and len(content) > MAX_VIDEO_BYTES:
-        raise HTTPException(status_code=400, detail="影片檔案超過 100MB 限制")
+    if media_type == "video" and len(content) > max_video_bytes:
+        limit_mb = max_video_bytes // (1024 * 1024)
+        raise HTTPException(status_code=400, detail=f"影片檔案超過 {limit_mb}MB 限制，請壓縮或縮短影片長度後再上傳")
 
     filename = f"{uuid.uuid4().hex}{ext}"
     content_type = file.content_type or mimetypes.guess_type(filename)[0]
 
-    if settings.use_supabase_storage:
+    # 優先權：S3 > Supabase Storage > 本地磁碟。
+    # 之所以 S3 優先，是為了讓「換到 S3」這件事只要設好環境變數就生效，
+    # 不用改程式碼；舊資料留在 Supabase 的網址完全不受影響，兩邊並存。
+    if settings.use_s3_storage:
+        file_url = _upload_to_s3(filename, content, content_type)
+    elif settings.use_supabase_storage:
         # 正式環境：存到 Supabase Storage，不會因為 Render 容器重啟而消失
         file_url = await _upload_to_supabase(filename, content, content_type)
     else:
-        # 本地開發：沒設定 Supabase 就退回存本地 uploads/ 資料夾
+        # 本地開發：沒設定雲端儲存就退回存本地 uploads/ 資料夾
         os.makedirs(settings.upload_dir, exist_ok=True)
         dest_path = os.path.join(settings.upload_dir, filename)
         with open(dest_path, "wb") as f:
@@ -92,7 +138,11 @@ async def _validate_and_store_file(file: UploadFile, category: str | None) -> tu
 
 
 async def _delete_stored_file(media: Media) -> None:
-    if settings.use_supabase_storage and media.file_url.startswith(settings.supabase_url):
+    s3_host = f"{settings.aws_s3_bucket}.s3.{settings.aws_region}.amazonaws.com" if settings.use_s3_storage else None
+    if s3_host and s3_host in media.file_url:
+        filename = media.file_url.rsplit("/", 1)[-1]
+        _delete_from_s3(filename)
+    elif settings.use_supabase_storage and media.file_url.startswith(settings.supabase_url):
         filename = media.file_url.rsplit("/", 1)[-1]
         await _delete_from_supabase(filename)
     elif media.file_url.startswith("/uploads/"):

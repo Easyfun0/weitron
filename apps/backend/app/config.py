@@ -17,6 +17,23 @@ class Settings(BaseSettings):
     supabase_service_role_key: str = ""
     supabase_storage_bucket: str = "media"
 
+    # AWS S3：四個都設定時優先於 Supabase Storage（用來把新上傳換到 S3，
+    # 不受 Supabase 免費方案單檔 50MB 上限限制）。舊資料留在 Supabase 的網址不受影響，
+    # 兩邊資料可以並存，不需要一次搬完。
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    aws_region: str = ""
+    aws_s3_bucket: str = ""
+
+    @property
+    def use_s3_storage(self) -> bool:
+        return bool(
+            self.aws_access_key_id
+            and self.aws_secret_access_key
+            and self.aws_region
+            and self.aws_s3_bucket
+        )
+
     @property
     def use_supabase_storage(self) -> bool:
         return bool(self.supabase_url and self.supabase_service_role_key)

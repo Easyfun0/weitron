@@ -10,3 +10,4 @@ bcrypt==4.2.1
 python-multipart==0.0.20
 python-dotenv==1.0.1
 httpx==0.28.1  # 上傳圖片/影片到 Supabase Storage 用
+boto3==1.35.99  # 上傳圖片/影片到 AWS S3 用
