@@ -3,6 +3,7 @@ from app.models.media import Media
 from app.models.admin_user import AdminUser
 from app.models.student import Student
 from app.models.note import Note
+from app.models.favorite import Favorite
 
 __all__ = [
     "QuestionGroup",
@@ -13,4 +14,5 @@ __all__ = [
     "AdminUser",
     "Student",
     "Note",
+    "Favorite",
 ]

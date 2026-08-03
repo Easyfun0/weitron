@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.db import Base, engine
-from app.routers import groups, admin, media, student, notes, auth
+from app.routers import groups, admin, media, student, notes, auth, favorites
 
 # MVP 直接用 create_all；有正式 schema 演進需求時改用 alembic upgrade
 Base.metadata.create_all(bind=engine)
@@ -26,6 +26,7 @@ app.include_router(media.router)
 app.include_router(student.router)
 app.include_router(notes.router)
 app.include_router(auth.router)
+app.include_router(favorites.router)
 
 
 @app.get("/health")
