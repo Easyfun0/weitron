@@ -63,6 +63,11 @@ export const saveNote = (dishId, content) => api.put(`/notes/dish/${dishId}`, { 
 
 export const getStudents = () => api.get('/admin/students')
 
+// 學員的「我的最愛／優先練習」標記，跟著帳號存在資料庫，換裝置登入也看得到
+export const getFavorites = () => api.get('/favorites')
+export const addFavorite = (code) => api.post(`/favorites/${code}`)
+export const removeFavorite = (code) => api.delete(`/favorites/${code}`)
+
 export const createQuestionGroup = (payload) => api.post('/admin/questions', payload)
 export const updateQuestionGroup = (code, payload) => api.put(`/admin/questions/${code}`, payload)
 export const deleteQuestionGroup = (code) => api.delete(`/admin/questions/${code}`)

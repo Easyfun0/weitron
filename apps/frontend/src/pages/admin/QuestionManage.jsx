@@ -25,6 +25,9 @@ export default function QuestionManage() {
         {/* <Link to="/admin/questions/new" className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
           + 新增題組
         </Link> */}
+        <div class="hidden md:flex gap-2">
+          <Link to="/">回前台</Link>
+        </div>
       </div>
       <table className="w-full text-sm border-collapse">
         <thead>

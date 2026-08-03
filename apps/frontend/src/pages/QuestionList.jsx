@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getGroups } from '../services/api.js'
+import { getGroups, getFavorites, addFavorite, removeFavorite } from '../services/api.js'
 import QuestionCard from '../components/QuestionCard.jsx'
 
 const GROUPS_CACHE_KEY = 'groups_cache_v1'
@@ -25,6 +25,10 @@ export default function QuestionList() {
   const [loading, setLoading] = useState(!hadCache)
   const [refreshing, setRefreshing] = useState(hadCache)
   const [error, setError] = useState(null)
+
+  // 「我的最愛／優先練習」：只有登入學員才能標記，跟著帳號存在資料庫（換裝置也看得到）
+  const isStudent = !!localStorage.getItem('student_token')
+  const [favorites, setFavorites] = useState(new Set())
 
   useEffect(() => {
     getGroups()
@@ -54,9 +58,47 @@ export default function QuestionList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    if (!isStudent) return
+    getFavorites()
+      .then((res) => setFavorites(new Set(res.data.codes)))
+      .catch(() => {
+        // 拿不到就當作沒有最愛清單，不影響其他功能
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const toggleFavorite = (code) => {
+    const isFavorite = favorites.has(code)
+    // 先更新畫面（樂觀更新），API 在背景同步，操作起來不會有延遲感
+    setFavorites((prev) => {
+      const next = new Set(prev)
+      if (isFavorite) next.delete(code)
+      else next.add(code)
+      return next
+    })
+    const request = isFavorite ? removeFavorite(code) : addFavorite(code)
+    request.catch(() => {
+      // 失敗就把畫面改回原本狀態
+      setFavorites((prev) => {
+        const next = new Set(prev)
+        if (isFavorite) next.add(code)
+        else next.delete(code)
+        return next
+      })
+    })
+  }
+
   const filtered = groups.filter(
     (g) => g.title.includes(keyword) || g.code.includes(keyword)
   )
+
+  // 標記過「我的最愛」的題組排到最前面，其餘維持原本（依題組編號）的順序
+  const sorted = [...filtered].sort((a, b) => {
+    const aFav = favorites.has(a.code) ? 1 : 0
+    const bFav = favorites.has(b.code) ? 1 : 0
+    return bFav - aFav
+  })
 
   return (
     <div className="max-w-4xl mx-auto p-4">
@@ -73,8 +115,14 @@ export default function QuestionList() {
       )}
       {error && <p className="text-red-500">載入失敗：{error}</p>}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        {filtered.map((g) => (
-          <QuestionCard key={g.code} group={g} />
+        {sorted.map((g) => (
+          <QuestionCard
+            key={g.code}
+            group={g}
+            showFavorite={isStudent}
+            isFavorite={favorites.has(g.code)}
+            onToggleFavorite={toggleFavorite}
+          />
         ))}
       </div>
     </div>
